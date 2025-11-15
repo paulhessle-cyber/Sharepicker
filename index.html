@@ -1,192 +1,141 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Day Trading Stock Picker</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-    <div id="root"></div>
+import React, { useState, useEffect } from 'react';
+import { RefreshCw, TrendingUp, Clock, AlertCircle, DollarSign, Globe } from 'lucide-react';
+
+export default function DayTradingPicker() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [stocks, setStocks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [marketStatuses, setMarketStatuses] = useState({
+    us: { isOpen: false, message: '' },
+    london: { isOpen: false, message: '' },
+    tokyo: { isOpen: false, message: '' }
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
     
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    checkAllMarketStatuses();
+    return () => clearInterval(timer);
+  }, []);
 
-        // Lucide icons as simple SVG components
-        const RefreshCw = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-        );
+  const checkAllMarketStatuses = () => {
+    const now = new Date();
+    
+    // US Market
+    const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const usDay = etTime.getDay();
+    const usHours = etTime.getHours();
+    const usMinutes = etTime.getMinutes();
+    const usCurrentMinutes = usHours * 60 + usMinutes;
+    const usMarketOpen = 9 * 60 + 30;
+    const usMarketClose = 16 * 60;
+    const usIsWeekday = usDay >= 1 && usDay <= 5;
+    const usIsDuringMarketHours = usCurrentMinutes >= usMarketOpen && usCurrentMinutes < usMarketClose;
+    const usIsOpen = usIsWeekday && usIsDuringMarketHours;
+    
+    let usMessage = '';
+    if (!usIsWeekday) {
+      usMessage = 'Closed (Weekend)';
+    } else if (usCurrentMinutes < usMarketOpen) {
+      usMessage = 'Opens 9:30 AM ET';
+    } else if (usCurrentMinutes >= usMarketClose) {
+      usMessage = 'Closed 4:00 PM ET';
+    } else {
+      usMessage = 'OPEN';
+    }
+    
+    // London Market
+    const londonTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
+    const londonDay = londonTime.getDay();
+    const londonHours = londonTime.getHours();
+    const londonMinutes = londonTime.getMinutes();
+    const londonCurrentMinutes = londonHours * 60 + londonMinutes;
+    const londonMarketOpen = 8 * 60;
+    const londonMarketClose = 16 * 60 + 30;
+    const londonIsWeekday = londonDay >= 1 && londonDay <= 5;
+    const londonIsDuringMarketHours = londonCurrentMinutes >= londonMarketOpen && londonCurrentMinutes < londonMarketClose;
+    const londonIsOpen = londonIsWeekday && londonIsDuringMarketHours;
+    
+    let londonMessage = '';
+    if (!londonIsWeekday) {
+      londonMessage = 'Closed (Weekend)';
+    } else if (londonCurrentMinutes < londonMarketOpen) {
+      londonMessage = 'Opens 8:00 AM GMT';
+    } else if (londonCurrentMinutes >= londonMarketClose) {
+      londonMessage = 'Closed 4:30 PM GMT';
+    } else {
+      londonMessage = 'OPEN';
+    }
+    
+    // Tokyo Market
+    const tokyoTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    const tokyoDay = tokyoTime.getDay();
+    const tokyoHours = tokyoTime.getHours();
+    const tokyoMinutes = tokyoTime.getMinutes();
+    const tokyoCurrentMinutes = tokyoHours * 60 + tokyoMinutes;
+    const tokyoMorningOpen = 9 * 60;
+    const tokyoLunchStart = 11 * 60 + 30;
+    const tokyoLunchEnd = 12 * 60 + 30;
+    const tokyoMarketClose = 15 * 60;
+    const tokyoIsWeekday = tokyoDay >= 1 && tokyoDay <= 5;
+    const tokyoIsOpen = tokyoIsWeekday && 
+      ((tokyoCurrentMinutes >= tokyoMorningOpen && tokyoCurrentMinutes < tokyoLunchStart) ||
+       (tokyoCurrentMinutes >= tokyoLunchEnd && tokyoCurrentMinutes < tokyoMarketClose));
+    
+    let tokyoMessage = '';
+    if (!tokyoIsWeekday) {
+      tokyoMessage = 'Closed (Weekend)';
+    } else if (tokyoCurrentMinutes < tokyoMorningOpen) {
+      tokyoMessage = 'Opens 9:00 AM JST';
+    } else if (tokyoCurrentMinutes >= tokyoLunchStart && tokyoCurrentMinutes < tokyoLunchEnd) {
+      tokyoMessage = 'Lunch Break';
+    } else if (tokyoCurrentMinutes >= tokyoMarketClose) {
+      tokyoMessage = 'Closed 3:00 PM JST';
+    } else {
+      tokyoMessage = 'OPEN';
+    }
+    
+    setMarketStatuses({
+      us: { isOpen: usIsOpen, message: usMessage },
+      london: { isOpen: londonIsOpen, message: londonMessage },
+      tokyo: { isOpen: tokyoIsOpen, message: tokyoMessage }
+    });
+  };
 
-        const TrendingUp = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-        );
-
-        const Clock = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-
-        const AlertCircle = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-
-        const DollarSign = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-
-        const Globe = ({ className }) => (
-            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-            </svg>
-        );
-
-        function DayTradingPicker() {
-          const [currentTime, setCurrentTime] = useState(new Date());
-          const [stocks, setStocks] = useState([]);
-          const [loading, setLoading] = useState(false);
-          const [error, setError] = useState(null);
-          const [marketStatuses, setMarketStatuses] = useState({
-            us: { isOpen: false, message: '' },
-            london: { isOpen: false, message: '' },
-            tokyo: { isOpen: false, message: '' }
-          });
-
-          useEffect(() => {
-            const timer = setInterval(() => {
-              setCurrentTime(new Date());
-            }, 1000);
-            
-            checkAllMarketStatuses();
-            return () => clearInterval(timer);
-          }, []);
-
-          const checkAllMarketStatuses = () => {
-            const now = new Date();
-            
-            // US Market
-            const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-            const usDay = etTime.getDay();
-            const usHours = etTime.getHours();
-            const usMinutes = etTime.getMinutes();
-            const usCurrentMinutes = usHours * 60 + usMinutes;
-            const usMarketOpen = 9 * 60 + 30;
-            const usMarketClose = 16 * 60;
-            const usIsWeekday = usDay >= 1 && usDay <= 5;
-            const usIsDuringMarketHours = usCurrentMinutes >= usMarketOpen && usCurrentMinutes < usMarketClose;
-            const usIsOpen = usIsWeekday && usIsDuringMarketHours;
-            
-            let usMessage = '';
-            if (!usIsWeekday) {
-              usMessage = 'Closed (Weekend)';
-            } else if (usCurrentMinutes < usMarketOpen) {
-              usMessage = 'Opens 9:30 AM ET';
-            } else if (usCurrentMinutes >= usMarketClose) {
-              usMessage = 'Closed 4:00 PM ET';
-            } else {
-              usMessage = 'OPEN';
-            }
-            
-            // London Market
-            const londonTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
-            const londonDay = londonTime.getDay();
-            const londonHours = londonTime.getHours();
-            const londonMinutes = londonTime.getMinutes();
-            const londonCurrentMinutes = londonHours * 60 + londonMinutes;
-            const londonMarketOpen = 8 * 60;
-            const londonMarketClose = 16 * 60 + 30;
-            const londonIsWeekday = londonDay >= 1 && londonDay <= 5;
-            const londonIsDuringMarketHours = londonCurrentMinutes >= londonMarketOpen && londonCurrentMinutes < londonMarketClose;
-            const londonIsOpen = londonIsWeekday && londonIsDuringMarketHours;
-            
-            let londonMessage = '';
-            if (!londonIsWeekday) {
-              londonMessage = 'Closed (Weekend)';
-            } else if (londonCurrentMinutes < londonMarketOpen) {
-              londonMessage = 'Opens 8:00 AM GMT';
-            } else if (londonCurrentMinutes >= londonMarketClose) {
-              londonMessage = 'Closed 4:30 PM GMT';
-            } else {
-              londonMessage = 'OPEN';
-            }
-            
-            // Tokyo Market
-            const tokyoTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-            const tokyoDay = tokyoTime.getDay();
-            const tokyoHours = tokyoTime.getHours();
-            const tokyoMinutes = tokyoTime.getMinutes();
-            const tokyoCurrentMinutes = tokyoHours * 60 + tokyoMinutes;
-            const tokyoMorningOpen = 9 * 60;
-            const tokyoLunchStart = 11 * 60 + 30;
-            const tokyoLunchEnd = 12 * 60 + 30;
-            const tokyoMarketClose = 15 * 60;
-            const tokyoIsWeekday = tokyoDay >= 1 && tokyoDay <= 5;
-            const tokyoIsOpen = tokyoIsWeekday && 
-              ((tokyoCurrentMinutes >= tokyoMorningOpen && tokyoCurrentMinutes < tokyoLunchStart) ||
-               (tokyoCurrentMinutes >= tokyoLunchEnd && tokyoCurrentMinutes < tokyoMarketClose));
-            
-            let tokyoMessage = '';
-            if (!tokyoIsWeekday) {
-              tokyoMessage = 'Closed (Weekend)';
-            } else if (tokyoCurrentMinutes < tokyoMorningOpen) {
-              tokyoMessage = 'Opens 9:00 AM JST';
-            } else if (tokyoCurrentMinutes >= tokyoLunchStart && tokyoCurrentMinutes < tokyoLunchEnd) {
-              tokyoMessage = 'Lunch Break';
-            } else if (tokyoCurrentMinutes >= tokyoMarketClose) {
-              tokyoMessage = 'Closed 3:00 PM JST';
-            } else {
-              tokyoMessage = 'OPEN';
-            }
-            
-            setMarketStatuses({
-              us: { isOpen: usIsOpen, message: usMessage },
-              london: { isOpen: londonIsOpen, message: londonMessage },
-              tokyo: { isOpen: tokyoIsOpen, message: tokyoMessage }
-            });
-          };
-
-          const fetchStockPicks = async () => {
-            setLoading(true);
-            setError(null);
-            
-            const openMarkets = [];
-            if (marketStatuses.us.isOpen) openMarkets.push('US (NYSE/NASDAQ)');
-            if (marketStatuses.london.isOpen) openMarkets.push('London (LSE)');
-            if (marketStatuses.tokyo.isOpen) openMarkets.push('Tokyo (TSE)');
-            
-            if (openMarkets.length === 0) {
-              setError('No markets are currently open. Please try again during trading hours.');
-              setLoading(false);
-              return;
-            }
-            
-            try {
-              const response = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "claude-sonnet-4-20250514",
-                  max_tokens: 4000,
-                  tools: [{
-                    type: "web_search_20250305",
-                    name: "web_search"
-                  }],
-                  messages: [{
-                    role: "user",
-                    content: `You are a global day trading stock analyst. Search and analyze current stock recommendations from these sources for TODAY (${currentTime.toDateString()}):
+  const fetchStockPicks = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const openMarkets = [];
+    if (marketStatuses.us.isOpen) openMarkets.push('US (NYSE/NASDAQ)');
+    if (marketStatuses.london.isOpen) openMarkets.push('London (LSE)');
+    if (marketStatuses.tokyo.isOpen) openMarkets.push('Tokyo (TSE)');
+    
+    if (openMarkets.length === 0) {
+      setError('No markets are currently open. Please try again during trading hours.');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          tools: [{
+            type: "web_search_20250305",
+            name: "web_search"
+          }],
+          messages: [{
+            role: "user",
+            content: `You are a global day trading stock analyst. Search and analyze current stock recommendations from these sources for TODAY (${currentTime.toDateString()}):
 
 SOURCES TO SEARCH:
 1. finviz.com - US top gainers and active stocks
@@ -223,203 +172,197 @@ Return ONLY a JSON array of exactly 5 stocks, no preamble or markdown. Format:
 ]
 
 Be specific about current prices and changes. Only include stocks from currently open markets.`
-                  }]
-                })
-              });
+          }]
+        })
+      });
 
-              const data = await response.json();
-              
-              let fullResponse = '';
-              if (data.content) {
-                for (const item of data.content) {
-                  if (item.type === 'text') {
-                    fullResponse += item.text;
-                  }
-                }
-              }
-              
-              const jsonMatch = fullResponse.match(/\[[\s\S]*\]/);
-              if (jsonMatch) {
-                const stockData = JSON.parse(jsonMatch[0]);
-                setStocks(stockData);
-              } else {
-                throw new Error('Could not parse stock data from response');
-              }
-              
-            } catch (err) {
-              console.error('Error fetching stocks:', err);
-              setError('Failed to fetch stock recommendations. Please try again.');
-            } finally {
-              setLoading(false);
-            }
-          };
+      const data = await response.json();
+      
+      let fullResponse = '';
+      if (data.content) {
+        for (const item of data.content) {
+          if (item.type === 'text') {
+            fullResponse += item.text;
+          }
+        }
+      }
+      
+      const jsonMatch = fullResponse.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const stockData = JSON.parse(jsonMatch[0]);
+        setStocks(stockData);
+      } else {
+        throw new Error('Could not parse stock data from response');
+      }
+      
+    } catch (err) {
+      console.error('Error fetching stocks:', err);
+      setError('Failed to fetch stock recommendations. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          useEffect(() => {
-            checkAllMarketStatuses();
-            const statusInterval = setInterval(checkAllMarketStatuses, 60000);
-            return () => clearInterval(statusInterval);
-          }, []);
+  useEffect(() => {
+    checkAllMarketStatuses();
+    const statusInterval = setInterval(checkAllMarketStatuses, 60000);
+    return () => clearInterval(statusInterval);
+  }, []);
 
-          const getMarketColor = (isOpen) => {
-            return isOpen 
-              ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700' 
-              : 'bg-slate-800/50 text-slate-400 border-slate-700';
-          };
+  const getMarketColor = (isOpen) => {
+    return isOpen 
+      ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700' 
+      : 'bg-slate-800/50 text-slate-400 border-slate-700';
+  };
 
-          const getMarketBadgeColor = (market) => {
-            switch(market) {
-              case 'US': return 'bg-blue-900/30 text-blue-300 border-blue-700';
-              case 'London': return 'bg-purple-900/30 text-purple-300 border-purple-700';
-              case 'Tokyo': return 'bg-red-900/30 text-red-300 border-red-700';
-              default: return 'bg-slate-900/30 text-slate-300 border-slate-700';
-            }
-          };
+  const getMarketBadgeColor = (market) => {
+    switch(market) {
+      case 'US': return 'bg-blue-900/30 text-blue-300 border-blue-700';
+      case 'London': return 'bg-purple-900/30 text-purple-300 border-purple-700';
+      case 'Tokyo': return 'bg-red-900/30 text-red-300 border-red-700';
+      default: return 'bg-slate-900/30 text-slate-300 border-slate-700';
+    }
+  };
 
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-6">
-              <div className="max-w-7xl mx-auto">
-                <div className="text-center mb-6 sm:mb-8">
-                  <h1 className="text-3xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent">
-                    Global Day Trading Stock Picker
-                  </h1>
-                  <div className="flex items-center justify-center gap-4 text-base sm:text-lg mb-4 flex-wrap">
-                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 sm:px-4 py-2 rounded-lg backdrop-blur">
-                      <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
-                      <span className="font-mono text-sm sm:text-base">{currentTime.toLocaleString()}</span>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent">
+            Global Day Trading Stock Picker
+          </h1>
+          <div className="flex items-center justify-center gap-4 text-base sm:text-lg mb-4 flex-wrap">
+            <div className="flex items-center gap-2 bg-slate-800/50 px-3 sm:px-4 py-2 rounded-lg backdrop-blur">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              <span className="font-mono text-sm sm:text-base">{currentTime.toLocaleString()}</span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto">
+            {Object.entries(marketStatuses).map(([key, status]) => {
+              const marketNames = { us: 'US Markets', london: 'London (LSE)', tokyo: 'Tokyo (TSE)' };
+              return (
+                <div key={key} className={`flex flex-col items-center gap-2 px-3 sm:px-4 py-3 rounded-lg backdrop-blur border ${getMarketColor(status.isOpen)}`}>
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    <span className="font-bold text-sm sm:text-base">{marketNames[key]}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${status.isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                    <span className="text-xs sm:text-sm">{status.message}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="text-center mb-6 sm:mb-8">
+          <button
+            onClick={fetchStockPicks}
+            disabled={loading}
+            className="bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 hover:from-blue-700 hover:via-purple-700 hover:to-emerald-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed shadow-lg inline-flex items-center gap-3"
+          >
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="text-sm sm:text-base">{loading ? 'Analyzing Markets...' : 'Get Top 5 Picks'}</span>
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <span className="text-red-300 text-sm sm:text-base">{error}</span>
+          </div>
+        )}
+
+        {stocks.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+              <span>Top 5 Global Day Trading Picks</span>
+            </h2>
+            
+            {stocks.map((stock, index) => (
+              <div
+                key={index}
+                className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4 sm:p-6 hover:border-purple-500 transition-all duration-200"
+              >
+                <div className="flex items-start justify-between mb-4 flex-wrap gap-3 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-emerald-600 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center font-bold text-lg sm:text-xl flex-shrink-0">
+                      {index + 1}
                     </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xl sm:text-2xl font-bold text-blue-400">{stock.symbol}</h3>
+                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold border ${getMarketBadgeColor(stock.market)}`}>
+                          {stock.market}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-sm sm:text-base">{stock.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right w-full sm:w-auto">
+                    <div className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-white justify-end">
+                      <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <span>{stock.price}</span>
+                    </div>
+                    <div className={`text-base sm:text-lg font-semibold ${stock.change.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {stock.change}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-300 text-sm sm:text-base">
+                    <span className="font-semibold text-slate-400">Volume:</span>
+                    <span>{stock.volume}</span>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto">
-                    {Object.entries(marketStatuses).map(([key, status]) => {
-                      const marketNames = { us: 'US Markets', london: 'London (LSE)', tokyo: 'Tokyo (TSE)' };
-                      return (
-                        <div key={key} className={`flex flex-col items-center gap-2 px-3 sm:px-4 py-3 rounded-lg backdrop-blur border ${getMarketColor(status.isOpen)}`}>
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4" />
-                            <span className="font-bold text-sm sm:text-base">{marketNames[key]}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${status.isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                            <span className="text-xs sm:text-sm">{status.message}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="bg-slate-900/50 rounded-lg p-3 sm:p-4">
+                    <p className="text-slate-300 leading-relaxed text-sm sm:text-base">{stock.reason}</p>
                   </div>
-                </div>
-
-                <div className="text-center mb-6 sm:mb-8">
-                  <button
-                    onClick={fetchStockPicks}
-                    disabled={loading}
-                    className="bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 hover:from-blue-700 hover:via-purple-700 hover:to-emerald-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed shadow-lg inline-flex items-center gap-3"
-                  >
-                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    <span className="text-sm sm:text-base">{loading ? 'Analyzing Markets...' : 'Get Top 5 Picks'}</span>
-                  </button>
-                </div>
-
-                {error && (
-                  <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    <span className="text-red-300 text-sm sm:text-base">{error}</span>
-                  </div>
-                )}
-
-                {stocks.length > 0 && (
-                  <div className="space-y-4">
-                    <h2 className="text-xl sm:text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
-                      <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
-                      <span>Top 5 Global Day Trading Picks</span>
-                    </h2>
-                    
-                    {stocks.map((stock, index) => (
-                      <div
-                        key={index}
-                        className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4 sm:p-6 hover:border-purple-500 transition-all duration-200"
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {stock.sources.map((source, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-blue-900/30 text-blue-300 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm border border-blue-700"
                       >
-                        <div className="flex items-start justify-between mb-4 flex-wrap gap-3 sm:gap-4">
-                          <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-emerald-600 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center font-bold text-lg sm:text-xl flex-shrink-0">
-                              {index + 1}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-xl sm:text-2xl font-bold text-blue-400">{stock.symbol}</h3>
-                                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold border ${getMarketBadgeColor(stock.market)}`}>
-                                  {stock.market}
-                                </span>
-                              </div>
-                              <p className="text-slate-400 text-sm sm:text-base">{stock.name}</p>
-                            </div>
-                          </div>
-                          <div className="text-right w-full sm:w-auto">
-                            <div className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-white justify-end">
-                              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
-                              <span>{stock.price}</span>
-                            </div>
-                            <div className={`text-base sm:text-lg font-semibold ${stock.change.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {stock.change}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-slate-300 text-sm sm:text-base">
-                            <span className="font-semibold text-slate-400">Volume:</span>
-                            <span>{stock.volume}</span>
-                          </div>
-                          
-                          <div className="bg-slate-900/50 rounded-lg p-3 sm:p-4">
-                            <p className="text-slate-300 leading-relaxed text-sm sm:text-base">{stock.reason}</p>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2">
-                            {stock.sources.map((source, idx) => (
-                              <span
-                                key={idx}
-                                className="bg-blue-900/30 text-blue-300 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm border border-blue-700"
-                              >
-                                {source}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                        {source}
+                      </span>
                     ))}
-                    
-                    <div className="bg-amber-900/20 border border-amber-600 rounded-lg p-4 mt-6">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <div className="text-xs sm:text-sm text-amber-200">
-                          <strong className="block mb-1">Disclaimer:</strong>
-                          This information is for educational purposes only and does not constitute financial advice. 
-                          Day trading carries significant risk. Always conduct your own research and consider consulting 
-                          with a financial advisor before making trading decisions.
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                )}
-
-                {!loading && stocks.length === 0 && !error && (
-                  <div className="text-center text-slate-400 py-12">
-                    <Globe className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg sm:text-xl mb-2">Click the button above to get today's top 5 global day trading picks</p>
-                    <p className="text-sm">Analyzes stocks from open markets only</p>
-                    <div className="mt-4 text-xs text-slate-500 max-w-2xl mx-auto px-4">
-                      <p className="mb-2">Sources: Finviz, TradingView, TheTradeRisk, StockTwits, Spiking,</p>
-                      <p>Motley Fool UK, Yahoo Finance UK, MarketWatch, Investing.com</p>
-                    </div>
-                  </div>
-                )}
+                </div>
+              </div>
+            ))}
+            
+            <div className="bg-amber-900/20 border border-amber-600 rounded-lg p-4 mt-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs sm:text-sm text-amber-200">
+                  <strong className="block mb-1">Disclaimer:</strong>
+                  This information is for educational purposes only and does not constitute financial advice. 
+                  Day trading carries significant risk. Always conduct your own research and consider consulting 
+                  with a financial advisor before making trading decisions.
+                </div>
               </div>
             </div>
-          );
-        }
+          </div>
+        )}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<DayTradingPicker />);
-    </script>
-</body>
-</html>
+        {!loading && stocks.length === 0 && !error && (
+          <div className="text-center text-slate-400 py-12">
+            <Globe className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
+            <p className="text-lg sm:text-xl mb-2">Click the button above to get today's top 5 global day trading picks</p>
+            <p className="text-sm">Analyzes stocks from open markets only</p>
+            <div className="mt-4 text-xs text-slate-500 max-w-2xl mx-auto px-4">
+              <p className="mb-2">Sources: Finviz, TradingView, TheTradeRisk, StockTwits, Spiking,</p>
+              <p>Motley Fool UK, Yahoo Finance UK, MarketWatch, Investing.com</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
