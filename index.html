@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Picker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+          const [time, setTime] = useState(new Date());
+          const [stocks, setStocks] = useState([]);
+          const [loading, setLoading] = useState(false);
+          const [error, setError] = useState(null);
+          const [markets, setMarkets] = useState({
+            us: { open: false, msg: '' },
+            london: { open: false, msg: '' },
+            tokyo: { open: false, msg: '' }
+          });
+
+          useEffect(() => {
+            const t = setInterval(() => setTime(new Date()), 1000);
+            checkMarkets();
+            return () => clearInterval(t);
+          }, []);
+
+          useEffect(() => {
+            checkMarkets();
+            const i = setInterval(checkMarkets, 60000);
+            return () => clearInterval(i);
+          }, []);
+
+          const checkMarkets = () => {
+            const now = new Date();
+            
+            const us = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const usDay = us.getDay();
+            const usMin = us.getHours() * 60 + us.getMinutes();
+            const usOpen = usDay >= 1 && usDay <= 5 && usMin >= 570 && usMin < 960;
+            const usMsg = !usDay || usDay > 5 ? 'Closed' : usMin < 570 ? 'Opens 9:30 AM ET' : usMin >= 960 ? 'Closed 4:00 PM ET' : 'OPEN';
+            
+            const ldn = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
+            const ldnDay = ldn.getDay();
+            const ldnMin = ldn.getHours() * 60 + ldn.getMinutes();
+            const ldnOpen = ldnDay >= 1 && ldnDay <= 5 && ldnMin >= 480 && ldnMin < 990;
+            const ldnMsg = !ldnDay || ldnDay > 5 ? 'Closed' : ldnMin < 480 ? 'Opens 8:00 AM GMT' : ldnMin >= 990 ? 'Closed 4:30 PM GMT' : 'OPEN';
+            
+            const tky = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+            const tkyDay = tky.getDay();
+            const tkyMin = tky.getHours() * 60 + tky.getMinutes();
+            const tkyOpen = tkyDay >= 1 && tkyDay <= 5 && ((tkyMin >= 540 && tkyMin < 690) || (tkyMin >= 750 && tkyMin < 900));
+            const tkyMsg = !tkyDay || tkyDay > 5 ? 'Closed' : tkyMin < 540 ? 'Opens 9:00 AM JST' : tkyMin >= 690 && tkyMin < 750 ? 'Lunch' : tkyMin >= 900 ? 'Closed 3:00 PM JST' : 'OPEN';
+            
+            setMarkets({
+              us: { open: usOpen, msg: usMsg },
+              london: { open: ldnOpen, msg: ldnMsg },
+              tokyo: { open: tkyOpen, msg: tkyMsg }
+            });
+          };
+
+          const fetchStocks = async () => {
+            setLoading(true);
+            setError(null);
+            
+            const open = [];
+            if (markets.us.open) open.push('US');
+            if (markets.london.open) open.push('London');
+            if (markets.tokyo.open) open.push('Tokyo');
+            
+            if (open.length === 0) {
+              setError('No markets open right now');
+              setLoading(false);
+              return;
+            }
+            
+            try {
+              const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-20250514",
+                  max_tokens: 4000,
+                  tools: [{ type: "web_search_20250305", name: "web_search" }],
+                  messages: [{
+                    role: "user",
+                    content: `Find 5 top day trading stocks for TODAY from open markets: ${open.join(', ')}. Search finviz.com, tradingview.com, thetraderisk.com, stocktwits.com, spiking.com, fool.co.uk, uk.finance.yahoo.com, marketwatch.com, investing.com. Return ONLY JSON array: [{"symbol":"","name":"","price":"","change":"","volume":"","market":"","reason":"","sources":[]}]`
+                  }]
+                })
+              });
+
+              const data = await res.json();
+              let txt = '';
+              if (data.content) {
+                data.content.forEach(item => {
+                  if (item.type === 'text') txt += item.text;
+                });
+              }
+              
+              const match = txt.match(/\[[\s\S]*\]/);
+              if (match) {
+                setStocks(JSON.parse(match[0]));
+              } else {
+                throw new Error('No data');
+              }
+            } catch (err) {
+              setError('Failed to fetch. Try again.');
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          return (
+            <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)', color: 'white', padding: '24px' }}>
+              <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                  <h1 style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '16px', background: 'linear-gradient(to right, #60a5fa, #a78bfa, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    Global Stock Picker
+                  </h1>
+                  <div style={{ fontSize: '18px', marginBottom: '16px' }}>
+                    {time.toLocaleString()}
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', maxWidth: '900px', margin: '0 auto' }}>
+                    <div style={{ padding: '16px', borderRadius: '8px', background: markets.us.open ? 'rgba(16, 185, 129, 0.1)' : 'rgba(51, 65, 85, 0.5)', border: '1px solid', borderColor: markets.us.open ? '#10b981' : '#475569' }}>
+                      <div style={{ fontWeight: 'bold' }}>US Markets</div>
+                      <div style={{ fontSize: '14px', marginTop: '8px' }}>{markets.us.msg}</div>
+                    </div>
+                    <div style={{ padding: '16px', borderRadius: '8px', background: markets.london.open ? 'rgba(16, 185, 129, 0.1)' : 'rgba(51, 65, 85, 0.5)', border: '1px solid', borderColor: markets.london.open ? '#10b981' : '#475569' }}>
+                      <div style={{ fontWeight: 'bold' }}>London (LSE)</div>
+                      <div style={{ fontSize: '14px', marginTop: '8px' }}>{markets.london.msg}</div>
+                    </div>
+                    <div style={{ padding: '16px', borderRadius: '8px', background: markets.tokyo.open ? 'rgba(16, 185, 129, 0.1)' : 'rgba(51, 65, 85, 0.5)', border: '1px solid', borderColor: markets.tokyo.open ? '#10b981' : '#475569' }}>
+                      <div style={{ fontWeight: 'bold' }}>Tokyo (TSE)</div>
+                      <div style={{ fontSize: '14px', marginTop: '8px' }}>{markets.tokyo.msg}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                  <button
+                    onClick={fetchStocks}
+                    disabled={loading}
+                    style={{ background: loading ? '#475569' : 'linear-gradient(to right, #2563eb, #7c3aed, #059669)', color: 'white', fontWeight: 'bold', padding: '16px 32px', borderRadius: '12px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '16px' }}
+                  >
+                    {loading ? 'Loading...' : 'Get Top 5 Picks'}
+                  </button>
+                </div>
+
+                {error && (
+                  <div style={{ background: 'rgba(220, 38, 38, 0.2)', border: '1px solid #dc2626', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+                    {error}
+                  </div>
+                )}
+
+                {stocks.length > 0 && (
+                  <div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center', marginBottom: '24px' }}>
+                      Top 5 Picks
+                    </h2>
+                    
+                    {stocks.map((stock, i) => (
+                      <div key={i} style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1px solid #475569', borderRadius: '12px', padding: '24px', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                            <div style={{ background: 'linear-gradient(to bottom right, #2563eb, #7c3aed, #059669)', width: '48px', height: '48px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px' }}>
+                              {i + 1}
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>{stock.symbol}</h3>
+                                <span style={{ background: 'rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', border: '1px solid #3b82f6' }}>
+                                  {stock.market}
+                                </span>
+                              </div>
+                              <p style={{ color: '#94a3b8' }}>{stock.name}</p>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stock.price}</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: stock.change.startsWith('+') ? '#34d399' : '#ef4444' }}>
+                              {stock.change}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div style={{ marginTop: '16px' }}>
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Volume:</strong> {stock.volume}
+                          </div>
+                          <div style={{ background: 'rgba(15, 23, 42, 0.5)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+                            {stock.reason}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {stock.sources.map((src, idx) => (
+                              <span key={idx} style={{ background: 'rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', border: '1px solid #3b82f6' }}>
+                                {src}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!loading && stocks.length === 0 && !error && (
+                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: '48px 0' }}>
+                    <p style={{ fontSize: '20px', marginBottom: '8px' }}>Click button to get today's picks</p>
+                    <p style={{ fontSize: '14px' }}>From: Finviz, TradingView, TheTradeRisk, StockTwits, Spiking, Motley Fool UK, Yahoo Finance UK, MarketWatch, Investing.com</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
